@@ -9596,21 +9596,40 @@ public class CoreBots
         }
     }
 
-    public void FindBestServer()
+    /// <summary>
+    /// Measures TCP connection latency to available game servers and reports each server's latency status.
+    /// Servers below the near-threshold are marked safe, servers approaching the warning threshold receive a warning,
+    /// and servers at or above the warning threshold are marked as high latency.
+    /// </summary>
+    /// <param name="warningThresholdMs">Latency in milliseconds at which a server is considered high latency. Defaults to 200 ms.</param>
+    /// <param name="nearThresholdMs">Distance below the warning threshold at which a server receives a near-threshold warning. Defaults to 25 ms.</param>
+    public void FindBestServer(int warningThresholdMs = 200, int nearThresholdMs = 25)
     {
+        if (warningThresholdMs <= 0)
+            throw new ArgumentOutOfRangeException(nameof(warningThresholdMs), "The warning threshold must be greater than zero.");
+
+        if (nearThresholdMs < 0 || nearThresholdMs >= warningThresholdMs)
+            throw new ArgumentOutOfRangeException(nameof(nearThresholdMs), "The near-threshold margin must be non-negative and smaller than the warning threshold.");
+
         List<Server> servers = Bot.Servers.GetServers(true).AsTask().GetAwaiter().GetResult();
+        if (servers.Count == 0)
+        {
+            Bot.Log("No game servers were returned.");
+            return;
+        }
 
         static long TcpPing(string host, int port = 5588, int timeoutMs = 2000)
         {
             try
             {
                 using TcpClient client = new();
-                Stopwatch sw = Stopwatch.StartNew();
+                Stopwatch stopwatch = Stopwatch.StartNew();
                 Task connectTask = client.ConnectAsync(host, port);
                 if (!connectTask.Wait(timeoutMs))
                     return long.MaxValue;
-                sw.Stop();
-                return sw.ElapsedMilliseconds;
+
+                stopwatch.Stop();
+                return stopwatch.ElapsedMilliseconds;
             }
             catch
             {
@@ -9618,21 +9637,37 @@ public class CoreBots
             }
         }
 
-        // Ping each unique host once
-        Dictionary<string, long> pingResults = new();
-        foreach (string host in servers.Select(s => s.IP).Distinct())
+        // Test each unique host once, then reuse its result for servers sharing that host.
+        Dictionary<string, long> pingResults = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string host in servers.Select(server => server.IP).Where(host => !string.IsNullOrWhiteSpace(host)).Distinct(StringComparer.OrdinalIgnoreCase))
             pingResults[host] = TcpPing(host);
 
-        // Pick the server with the lowest ping
-        Server? best = servers
-            .Where(s => pingResults[s.IP] != long.MaxValue)
-            .OrderBy(s => pingResults[s.IP])
-            .FirstOrDefault();
+        long nearThreshold = warningThresholdMs - nearThresholdMs;
+        List<(Server Server, long Ping)> results = servers
+            .Where(server => !string.IsNullOrWhiteSpace(server.IP) && pingResults.TryGetValue(server.IP, out long ping) && ping != long.MaxValue)
+            .Select(server => (server, pingResults[server.IP]))
+            .OrderBy(result => result.Item2)
+            .ToList();
 
-        if (best is not null)
-            Bot.Log($"Most optimal server: {best.Name} ({best.IP}) - {pingResults[best.IP]}ms");
-        else
-            Bot.Log("Could not determine an optimal server, all hosts failed to connect.");
+        foreach ((Server server, long ping) in results)
+        {
+            string status = ping >= warningThresholdMs
+                ? "🛑"
+                : ping >= nearThreshold
+                    ? "⚠️"
+                    : "✅";
+
+            Bot.Log($"{status} {server.Name} ({server.IP}) - {ping}ms");
+        }
+
+        if (results.Count == 0)
+        {
+            Bot.Log("Could not determine server latency. All tested hosts failed to connect.");
+            return;
+        }
+
+        (Server bestServer, long bestPing) = results[0];
+        Bot.Log($"Best server: {bestServer.Name} ({bestServer.IP}) - {bestPing}ms");
     }
 
     static long TcpPing(string host, int[] ports, int timeoutMs = 2000)
