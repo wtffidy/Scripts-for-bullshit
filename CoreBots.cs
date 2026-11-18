@@ -286,6 +286,23 @@ public class CoreBots
                 loadAttempts++;
             }
 
+            // A disconnect restarts the script while the client is still logging back in, and a relogin
+            // attempt can look logged in at first and fail seconds later. Give the client up to 2 minutes
+            // to be logged in and loaded before giving up; otherwise the script stops (or sits on the
+            // message box) and the relogin then finds it "already running" and never starts it again.
+            // Not gated on Bot.Options.AutoRelogin: the client's relogin turns it off while it retries.
+            if (!Bot.Player.LoggedIn)
+            {
+                Logger("Not logged in yet, waiting up to 2 min for the login.");
+                DateTime giveUp = DateTime.Now.AddMinutes(2);
+                while (!Bot.ShouldExit && DateTime.Now < giveUp && !(Bot.Player.LoggedIn && Bot.Player.Loaded))
+                    Bot.Sleep(1000);
+            }
+
+            // Being stopped while waiting: don't open the log-in message box on the way out.
+            if (Bot.ShouldExit)
+                return;
+
             // Only stop AFTER retries exhausted
             if (!Bot.Player.LoggedIn)
             {
@@ -6050,13 +6067,13 @@ public class CoreBots
 
         foreach (ItemBase requirement in quest.Requirements)
         {
-            if (CheckInventory(requirement.ID, requirement.Quantity))
-                continue;
-
             if (pairIndex >= MapMonsterClassPairs.Length)
                 break;
 
             var (mapName, monsterName, classType) = MapMonsterClassPairs[pairIndex++];
+
+            if (CheckInventory(requirement.ID, requirement.Quantity))
+                continue;
 
             EquipClass(classType);
 
@@ -6678,7 +6695,12 @@ public class CoreBots
     {
         List<Monster> matches = FindMonstersList(map, monster, monsterMapID);
 
-        return matches.FirstOrDefault(x => x.Alive)
+        // Prefer a live match in the cell we're already in, so we don't jump around unnecessarily without killing anything.
+        string? currentCell = Bot.Player?.Cell;
+        return (currentCell != null
+                ? matches.FirstOrDefault(x => x.Alive && string.Equals(x.Cell, currentCell, StringComparison.OrdinalIgnoreCase))
+                : null)
+            ?? matches.FirstOrDefault(x => x.Alive)
             ?? matches.FirstOrDefault();
     }
 
@@ -7069,6 +7091,48 @@ public class CoreBots
 
 
 
+
+    /// <summary>
+    /// Hunts ArchFiend DragonLord using rank 10 Chaos Slayer, rank 10 Yami no Ronin,
+    /// or the configured dodge class, in that order.
+    /// </summary>
+    /// <param name="item">The item to obtain, or null to kill the boss once.</param>
+    /// <param name="quant">The desired item quantity.</param>
+    /// <param name="isTemp">Whether the item is temporary.</param>
+    /// <param name="log">Whether to log the hunt.</param>
+    /// <param name="publicRoom">Whether to use a public room.</param>
+    public void KillArchFiendDragonLord(string? item = null, int quant = 1, bool isTemp = true, bool log = true, bool publicRoom = false)
+    {
+        if (item != null)
+        {
+            if (isTemp && Bot.TempInv.Contains(item, quant))
+                return;
+            if (!isTemp && CheckInventory(item, quant))
+                return;
+        }
+
+        List<InventoryItem> ownedClasses = Bot.Inventory.Items.Concat(Bot.Bank.Items).Where(i => i.Category == ItemCategory.Class).ToList();
+        if (ownedClasses.FirstOrDefault(i => i.Name.StartsWith("Chaos Slayer", StringComparison.OrdinalIgnoreCase) && CheckClassRank(ClassName: i.Name) == 10) is InventoryItem chaosSlayer)
+        {
+            Equip(chaosSlayer.Name);
+            Bot.Skills.StartAdvanced(chaosSlayer.Name, false, ClassUseMode.Base);
+        }
+        else if (ownedClasses.FirstOrDefault(i => i.Name.Equals("Yami no Ronin", StringComparison.OrdinalIgnoreCase) && CheckClassRank(ClassName: i.Name) == 10) is InventoryItem yamiNoRonin)
+        {
+            Equip(yamiNoRonin.Name);
+            Bot.Skills.StartAdvanced(yamiNoRonin.Name, false, ClassUseMode.Def);
+        }
+        else
+        {
+            EquipClass(ClassType.Dodge);
+            if (IsGenericClass(DodgeClass))
+                Logger("No Chaos Slayer or Yami no Ronin found and no dodge class is set. Using the currently equipped class for ArchFiend DragonLord. This might fail. GOOD LUCK!!!");
+            else
+                Logger("No Chaos Slayer or Yami no Ronin found. Using the dodge class for ArchFiend DragonLord. This might fail.");
+        }
+
+        HuntMonster("underlair", "ArchFiend DragonLord", item, quant, isTemp, log, publicRoom);
+    }
 
     public void KillDoomKitten(string? item = null, int quant = 1, bool isTemp = false, bool log = true)
     {
@@ -8468,48 +8532,73 @@ public class CoreBots
     bool usingBossGeneric = false;
 
     /// <summary>
+    /// True for class slot values that mean "no specific class": null/empty, "Generic" or "(Current)".
+    /// </summary>
+    public static bool IsGenericClass(string? name) =>
+        string.IsNullOrEmpty(name)
+        || name.Equals("Generic", StringComparison.OrdinalIgnoreCase)
+        || name == "(Current)";
+
+    /// <summary>
     /// Equips either the FarmClass or SoloClass (or Dodge/Boss) from CoreBots
     /// </summary>
     /// <param name="classToUse">Type "ClassType." and then either Farm, Solo, Dodge, or Boss</param>
     public void EquipClass(ClassType classToUse)
     {
-        // Already equipped? Skip if timer is running
-        if (currentClass == classToUse && Bot.Skills.TimerRunning)
+        string? targetClass = classToUse switch
+        {
+            ClassType.Solo => SoloClass,
+            ClassType.Farm => FarmClass,
+            ClassType.Dodge => DodgeClass,
+            ClassType.Boss => BossClass,
+            _ => null,
+        };
+
+        // Skip while the skill timer runs for this slot, but only when there is nothing to do:
+        // - the slot is generic, or
+        // - the slot's class is actually worn (so a class swapped in by e.g. UseBossClass, or a
+        //   class changed at runtime, gets re-equipped), or
+        // - the slot's class isn't owned (nothing to equip; checked again on every call, so it
+        //   is equipped as soon as it's acquired). _equipClass loops until the class is worn,
+        //   so an owned class can't silently fail.
+        if (
+            currentClass == classToUse
+            && Bot.Skills.TimerRunning
+            && (
+                IsGenericClass(targetClass)
+                || string.Equals(Bot.Player.CurrentClass?.Name?.Trim(), targetClass!.Trim(), StringComparison.OrdinalIgnoreCase)
+                || !CheckInventory(targetClass, toInv: false)
+            )
+        )
             return;
 
         currentClass = classToUse;
 
+        // using*Generic is captured once in SetOptions. Only let it block an equip while the
+        // slot is still generic, so a class set at runtime isn't ignored as "generic" forever.
         switch (classToUse)
         {
             case ClassType.Farm:
-                if (FarmClass != "Generic" && FarmClass != "(Current)"
-                    && !string.IsNullOrEmpty(FarmClass)
-                    && CheckInventory(FarmClass))
-                    if (_equipClass(usingFarmGeneric, FarmClass, FarmUseMode, FarmGearOn, FarmGear))
+                if (!IsGenericClass(FarmClass) && CheckInventory(FarmClass))
+                    if (_equipClass(usingFarmGeneric && IsGenericClass(FarmClass), FarmClass, FarmUseMode, FarmGearOn, FarmGear))
                         return;
                 break;
 
             case ClassType.Solo:
-                if (SoloClass != "Generic" && SoloClass != "(Current)"
-                    && !string.IsNullOrEmpty(SoloClass)
-                    && CheckInventory(SoloClass))
-                    if (_equipClass(usingSoloGeneric, SoloClass, SoloUseMode, SoloGearOn, SoloGear))
+                if (!IsGenericClass(SoloClass) && CheckInventory(SoloClass))
+                    if (_equipClass(usingSoloGeneric && IsGenericClass(SoloClass), SoloClass, SoloUseMode, SoloGearOn, SoloGear))
                         return;
                 break;
 
             case ClassType.Dodge:
-                if (DodgeClass != "Generic" && DodgeClass != "(Current)"
-                    && !string.IsNullOrEmpty(DodgeClass)
-                    && CheckInventory(DodgeClass))
-                    if (_equipClass(usingDodgeGeneric, DodgeClass, DodgeUseMode, DodgeGearOn, DodgeGear))
+                if (!IsGenericClass(DodgeClass) && CheckInventory(DodgeClass))
+                    if (_equipClass(usingDodgeGeneric && IsGenericClass(DodgeClass), DodgeClass, DodgeUseMode, DodgeGearOn, DodgeGear))
                         return;
                 break;
 
             case ClassType.Boss:
-                if (BossClass != "Generic" && BossClass != "(Current)"
-                    && !string.IsNullOrEmpty(BossClass)
-                    && CheckInventory(BossClass))
-                    if (_equipClass(usingBossGeneric, BossClass, BossUseMode, BossGearOn, BossGear))
+                if (!IsGenericClass(BossClass) && CheckInventory(BossClass))
+                    if (_equipClass(usingBossGeneric && IsGenericClass(BossClass), BossClass, BossUseMode, BossGearOn, BossGear))
                         return;
                 break;
         }
@@ -9507,61 +9596,86 @@ public class CoreBots
         }
     }
 
-    public void FindBestServer()
+    /// <summary>
+    /// Finds the optimal game server by measuring actual AQW handshake latency.
+    /// Uses three samples per server and selects the server with the lowest median latency.
+    /// </summary>
+    public async Task<string> FindBestServer()
     {
-        List<Server> servers = Bot.Servers.GetServers(true).AsTask().GetAwaiter().GetResult();
+        List<Server> servers = await Bot.Servers.GetServers(true);
+        byte[] versionCheck = Encoding.UTF8.GetBytes("<msg t='sys'><body action='verChk' r='0'><ver v='165' /></body></msg>\0");
+        Dictionary<string, long> pingResults = new();
 
-        static long TcpPing(string host, int port = 5588, int timeoutMs = 2000)
+        foreach (Server server in servers.Where(s => s.Online && !string.IsNullOrWhiteSpace(s.IP) && s.Port > 0))
         {
-            try
+            List<double> samples = new(3);
+
+            for (int sample = 0; sample < 3; sample++)
             {
-                using TcpClient client = new();
-                Stopwatch sw = Stopwatch.StartNew();
-                Task connectTask = client.ConnectAsync(host, port);
-                if (!connectTask.Wait(timeoutMs))
-                    return long.MaxValue;
-                sw.Stop();
-                return sw.ElapsedMilliseconds;
+                try
+                {
+                    Stopwatch stopwatch = Stopwatch.StartNew();
+                    using TcpClient client = new();
+                    await client.ConnectAsync(server.IP, server.Port).WaitAsync(TimeSpan.FromMilliseconds(2500));
+
+                    using NetworkStream stream = client.GetStream();
+                    await stream.WriteAsync(versionCheck.AsMemory());
+                    await stream.FlushAsync();
+
+                    using CancellationTokenSource timeout = new(2500);
+                    byte[] buffer = new byte[1];
+                    StringBuilder response = new();
+
+                    while (!timeout.IsCancellationRequested)
+                    {
+                        int bytesRead = await stream.ReadAsync(buffer.AsMemory(), timeout.Token);
+                        if (bytesRead == 0)
+                            break;
+
+                        if (buffer[0] != 0)
+                        {
+                            response.Append((char)buffer[0]);
+                            continue;
+                        }
+
+                        string message = response.ToString();
+                        response.Clear();
+
+                        if (message.Contains("action='apiOK'", StringComparison.OrdinalIgnoreCase) ||
+                            message.Contains("action=\"apiOK\"", StringComparison.OrdinalIgnoreCase))
+                        {
+                            stopwatch.Stop();
+                            samples.Add(stopwatch.Elapsed.TotalMilliseconds);
+                            break;
+                        }
+
+                        if (message.Contains("action='apiKO'", StringComparison.OrdinalIgnoreCase) ||
+                            message.Contains("action=\"apiKO\"", StringComparison.OrdinalIgnoreCase))
+                            break;
+                    }
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception) { }
             }
-            catch
+
+            if (samples.Count == 0)
             {
-                return long.MaxValue;
+                pingResults[server.IP] = long.MaxValue;
+                continue;
             }
+
+            samples.Sort();
+            pingResults[server.IP] = (long)Math.Round(samples[samples.Count / 2], MidpointRounding.AwayFromZero);
         }
 
-        // Ping each unique host once
-        Dictionary<string, long> pingResults = new();
-        foreach (string host in servers.Select(s => s.IP).Distinct())
-            pingResults[host] = TcpPing(host);
-
-        // Pick the server with the lowest ping
         Server? best = servers
-            .Where(s => pingResults[s.IP] != long.MaxValue)
+            .Where(s => pingResults.TryGetValue(s.IP, out long ping) && ping != long.MaxValue)
             .OrderBy(s => pingResults[s.IP])
             .FirstOrDefault();
-
         if (best is not null)
-            Bot.Log($"Most optimal server: {best.Name} ({best.IP}) - {pingResults[best.IP]}ms");
-        else
-            Bot.Log("Could not determine an optimal server, all hosts failed to connect.");
+            return $"Most optimal server: {best.Name} ({best.IP}) - {pingResults[best.IP]}ms";
 
-
-
-    }
-    static long TcpPing(string host, int[] ports, int timeoutMs = 2000)
-    {
-        foreach (int port in ports)
-        {
-            try
-            {
-                using TcpClient client = new();
-                Stopwatch sw = Stopwatch.StartNew();
-                if (client.ConnectAsync(host, port).Wait(timeoutMs))
-                    return sw.ElapsedMilliseconds;
-            }
-            catch { }
-        }
-        return long.MaxValue;
+        return "Could not determine an optimal server, all hosts failed their AQW handshake.";
     }
 
 
@@ -9742,6 +9856,10 @@ public class CoreBots
 
         switch (Bot.Map.Name)
         {
+
+            case "wormhole":
+                blackListedCells.UnionWith(new[] { "r8a" });
+                break;
 
             case "towerofmirrors":
                 blackListedCells.UnionWith(new[] { "replay", "EndCuts" });
@@ -10110,7 +10228,10 @@ public class CoreBots
                 break;
 
             case "ultradrakath":
-                SimpleQuestBypass((182, 5));
+                if (Bot.Flash.CallGameFunction<int>("world.getQuestValue", 182) < 5)
+                    SimpleQuestBypass((182, 5));
+                else
+                    tryJoin();
                 break;
 
             case "backroom":
@@ -10271,8 +10392,6 @@ public class CoreBots
                             + "Not sure why it loads tercessuinotlim first, but get over it :|",
                         messageBox: false
                     );
-
-                    SimpleQuestBypass((15, 8), (542, 2));
                     Join("citadel");
                     Jump("m22", "Left");
                     EquipClass(ClassType.Solo);
@@ -10290,7 +10409,6 @@ public class CoreBots
                     prereqQuest2 = true;
                 }
 
-                Jump("m22", "Left");
                 tryJoin();
                 break;
 
@@ -11127,9 +11245,7 @@ public class CoreBots
     public bool inPublicRoom()
     {
         Bot.Wait.ForMapLoad(Bot.Map.Name);
-        if (!int.TryParse(Bot.Map.FullName.Split('-').Last(), out int nr))
-            nr = 1;
-        return nr < 1000;
+        return true;
     }
 
     /// <summary>

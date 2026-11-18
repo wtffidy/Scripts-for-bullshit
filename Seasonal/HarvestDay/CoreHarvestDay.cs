@@ -67,6 +67,7 @@ public class CoreHarvestDay
             BlightHarvest();
             ManaHarvest();
             MoglinFeast();
+			CharityFeast();
         }
         else
         {
@@ -197,7 +198,13 @@ public class CoreHarvestDay
         Story.KillQuest(895, "twilight", "Gressil");
 
         //Complete Airheads 896
-        Story.KillQuest(896, "float", new[] { "Cysero Balloon", "Beleen Balloon" });
+        if (!Story.QuestProgression(896))
+        {
+            Core.EnsureAccept(896);
+            Core.HuntMonster("float", "Beleen Balloon", "Deflated Beleen", 4);
+            Core.HuntMonster("float", "Cysero Balloon", "Deflated Cysero", 4);
+            Core.EnsureComplete(896);
+        }
 
         //The Final Pilgrimage 897
         Story.KillQuest(897, "float", "Twilly Balloon");
@@ -235,7 +242,14 @@ public class CoreHarvestDay
         Story.MapItemQuest(1441, "grams", 715);
 
         //Creatures Serving Chaos 1442
-        Story.KillQuest(1442, "grams", new[] { "Wolf", "Wereboar", "Spider" });
+        if (!Story.QuestProgression(1442))
+        {
+            Core.EnsureAccept(1442);
+            Core.HuntMonster("grams", "Wolf", "Wolf Pelt", 5);
+            Core.HuntMonster("grams", "Wereboar", "Boar Tusk", 5);
+            Core.HuntMonster("grams", "Spider", "Spider Silk", 5);
+            Core.EnsureComplete(1442);
+        }
 
         //Bandit Battles 1443
         Story.KillQuest(1443, "grams", "Bandit");
@@ -256,7 +270,13 @@ public class CoreHarvestDay
         Story.PreLoad(this);
 
         //Chaos Critters in the Crops 1437
-        Story.KillQuest(1437, "artixhome", new[] { "Mosquito", "Chaorrupted Poultrygeist" });
+        if (!Story.QuestProgression(1437))
+        {
+            Core.EnsureAccept(1437);
+            Core.HuntMonster("artixhome", "Mosquito", "Mosquito Squashed", 7);
+            Core.HuntMonster("artixhome", "Chaorrupted Poultrygeist", "Poultry Plucked", 6);
+            Core.EnsureComplete(1437);
+        }
 
         //Zombehs Aren't So Smart 1438
         Story.MapItemQuest(1438, "artixhome", 714, 10);
@@ -325,10 +345,22 @@ public class CoreHarvestDay
         Story.MapItemQuest(3209, "killerkitchen", 2231);
 
         //Cornstalkerbread Stuffing 3210
-        Story.KillQuest(3210, "harvest", new[] { "Corn Stalker", "Corn Stalker" });
+        if (!Story.QuestProgression(3210))
+        {
+            Core.EnsureAccept(3210);
+            Core.HuntMonster("harvest", "Corn Stalker", "Yellow Stalker Kernel", 10);
+            Core.HuntMonster("harvest", "Corn Stalker", "White Stalker Kernel", 10);
+            Core.EnsureComplete(3210);
+        }
 
         //Super Special Chutney 3211
-        Story.KillQuest(3211, "harvest", new[] { "Bad Apple", "Grapes of Wrath" });
+        if (!Story.QuestProgression(3211))
+        {
+            Core.EnsureAccept(3211);
+            Core.HuntMonster("harvest", "Bad Apple", "Good Apple Chunks", 6);
+            Core.HuntMonster("harvest", "Grapes of Wrath", "Grapey Wrath", 6);
+            Core.EnsureComplete(3211);
+        }
 
         //Oishii's Secret Ingredient 3212
         Story.KillQuest(3212, "killerkitchen", "Harvest Sneevil");
@@ -357,7 +389,13 @@ public class CoreHarvestDay
         Story.KillQuest(7216, "furblefeast", "Mini Turdraken");
 
         // Meat and Eggs 7217
-        Story.KillQuest(7217, "furblefeast", new[] { "Harvest Sneevil", "Turkey" });
+        if (!Story.QuestProgression(7217))
+        {
+            Core.EnsureAccept(7217);
+            Core.HuntMonster("furblefeast", "Harvest Sneevil", "Harvest Meat", 6);
+            Core.HuntMonster("furblefeast", "Turkey", "Turkey Egg", 6);
+            Core.EnsureComplete(7217);
+        }
 
         // Zombies! 7218
         Story.KillQuest(7218, "furblefeast", "Meat Zombie");
@@ -512,7 +550,13 @@ public class CoreHarvestDay
         Story.KillQuest(7789, "gothicdream", "Ice Scream");
 
         // Clear the Hallway 7790
-        Story.KillQuest(7790, "gothicdream", new[] { "Spooky Lantern", "Bat Garland" });
+        if (!Story.QuestProgression(7790))
+        {
+            Core.EnsureAccept(7790);
+            Core.HuntMonster("gothicdream", "Bat Garland", "Bat Garland Slain", 5);
+            Core.HuntMonster("gothicdream", "Spooky Lantern", "Spooky Lantern Slain", 5);
+            Core.EnsureComplete(7790);
+        }
 
         // Sleepytime Gear 7791
         Story.MapItemQuest(7791, "gothicdream", new[] { 7820, 7821 });
@@ -528,11 +572,14 @@ public class CoreHarvestDay
         Story.KillQuest(7794, "gothicdream", "Sleep Paralysis");
 
         // Clean Up Clean Up Everybody Do Your Scare 7795
-        Story.KillQuest(
-            7795,
-            "gothicdream",
-            new[] { "Spooky Lantern", "Bat Garland", "Ice Scream" }
-        );
+        if (!Story.QuestProgression(7795))
+        {
+            Core.EnsureAccept(7795);
+            Core.HuntMonster("gothicdream", "Bat Garland", "Bats Chased Out", 8);
+            Core.HuntMonster("gothicdream", "Ice Scream", "Ice Scream Mopped Up", 8);
+            Core.HuntMonster("gothicdream", "Spooky Lantern", "Lantern Pieces Doomba'd", 8);
+            Core.EnsureComplete(7795);
+        }
     }
 
     public void MemetNightmare()
@@ -563,7 +610,13 @@ public class CoreHarvestDay
         }
 
         // Board up the Windows 7800
-        Story.KillQuest(7800, "memetnightmare", new[] { "Fire Cyclone", "Fire Cyclone" });
+        if (!Story.QuestProgression(7800))
+        {
+            Core.EnsureAccept(7800);
+            Core.HuntMonster("memetnightmare", "Fire Cyclone", "Box of Nails");
+            Core.HuntMonster("memetnightmare", "Fire Cyclone", "Sturdy Board", 6);
+            Core.EnsureComplete(7800);
+        }
 
         // Energy Needed 7801
         Story.KillQuest(7801, "memetnightmare", "Eye Wyrm");
@@ -575,7 +628,13 @@ public class CoreHarvestDay
         Story.KillQuest(7803, "memetnightmare", "Nightmare Maw");
 
         // Stop the Storm 7804
-        Story.KillQuest(7804, "memetnightmare", new[] { "Fire Cyclone", "Burning Ember" });
+        if (!Story.QuestProgression(7804))
+        {
+            Core.EnsureAccept(7804);
+            Core.HuntMonster("memetnightmare", "Fire Cyclone", "Cyclone Slain", 5);
+            Core.HuntMonster("memetnightmare", "Burning Ember", "Ember Slain", 5);
+            Core.EnsureComplete(7804);
+        }
 
         // Cannibal Mermaids? 7805
         Story.KillQuest(7805, "memetnightmare", "Scuttlefish");
@@ -587,11 +646,14 @@ public class CoreHarvestDay
         Story.KillQuest(7807, "memetnightmare", "Dark Pit of Despair");
 
         // Quiet Down, Will Ya? 7808
-        Story.KillQuest(
-            7808,
-            "memetnightmare",
-            new[] { "Fire Cyclone", "Burning Ember", "Cannibal Mermaid" }
-        );
+        if (!Story.QuestProgression(7808))
+        {
+            Core.EnsureAccept(7808);
+            Core.HuntMonster("memetnightmare", "Fire Cyclone", "Cyclones Subdued", 8);
+            Core.HuntMonster("memetnightmare", "Burning Ember", "Embers Smothered", 8);
+            Core.HuntMonster("memetnightmare", "Cannibal Mermaid", "Mermaids Dispersed", 8);
+            Core.EnsureComplete(7808);
+        }
     }
 
     public void NightmareWar()
@@ -657,7 +719,13 @@ public class CoreHarvestDay
         Story.MapItemQuest(8946, "ebiltakeover", 10860, 5);
 
         //Drones and Drones 8947
-        Story.KillQuest(8947, "ebiltakeover", new[] { "Ebil Battle Drone", "Traitor Goon" });
+        if (!Story.QuestProgression(8947))
+        {
+            Core.EnsureAccept(8947);
+            Core.HuntMonster("ebiltakeover", "Ebil Battle Drone", "Ebil Battle Drone Defeated", 6);
+            Core.HuntMonster("ebiltakeover", "Traitor Goon", "Traitor Goons Defeated", 6);
+            Core.EnsureComplete(8947);
+        }
 
         //Tech Collection 8948
         Story.KillQuest(8948, "ebiltakeover", "Ebil Battle Drone");
@@ -666,11 +734,14 @@ public class CoreHarvestDay
         Story.KillQuest(8949, "ebiltakeover", "Ebil General Porkon");
 
         //Variety Is The Spice Of Life 8950
-        Story.KillQuest(
-            8950,
-            "ebiltakeover",
-            new[] { "Ebil Fishman", "EbilCorp Slime", "Ebil Battle Drone" }
-        );
+        if (!Story.QuestProgression(8950))
+        {
+            Core.EnsureAccept(8950);
+            Core.HuntMonster("ebiltakeover", "Ebil Fishman", "Fishman Defeated", 4);
+            Core.HuntMonster("ebiltakeover", "EbilCorp Slime", "Slime Defeated", 4);
+            Core.HuntMonster("ebiltakeover", "Ebil Battle Drone", "Drone Battled", 4);
+            Core.EnsureComplete(8950);
+        }
 
         //Draconian Destruction 8951
         Story.KillQuest(8951, "ebiltakeover", "Ebil Draconian");
@@ -685,7 +756,13 @@ public class CoreHarvestDay
         Story.KillQuest(8967, "ebiltakeover", "Ebil Ghoul");
 
         // Sample Processing 8968
-        Story.KillQuest(8968, "ebiltakeover", new[] { "Traitor Goon", "Ebil Fishman" });
+        if (!Story.QuestProgression(8968))
+        {
+            Core.EnsureAccept(8968);
+            Core.HuntMonster("ebiltakeover", "Traitor Goon", "Symptoms Checked", 10);
+            Core.HuntMonster("ebiltakeover", "Ebil Fishman", "Food Crumbs", 5);
+            Core.EnsureComplete(8968);
+        }
 
         // What's That Smell 8969
         Story.KillQuest(8969, "ebiltakeover", "Mystery Meat");
@@ -997,11 +1074,11 @@ public class CoreHarvestDay
         // 10491 | Vegetarian Fricassee
         if (!Story.QuestProgression(10491))
         {
-            Core.HuntMonsterQuest(
-                10491,
-                ("moglinfeast", UseableMonsters[0], ClassType.Farm),
-                ("moglinfeast", UseableMonsters[1], ClassType.Farm)
-            );
+            Core.EnsureAccept(10491);
+            Core.EquipClass(ClassType.Farm);
+            Core.HuntMonster("moglinfeast", "Dianthus Fae", "Dianthus Pollen", 10);
+            Core.HuntMonster("moglinfeast", "Pumpkin Mimic", "Peeled Mimic", 5);
+            Core.EnsureComplete(10491);
         }
 
         // 10492 | No Thoughts, Head Empty
@@ -1035,11 +1112,11 @@ public class CoreHarvestDay
         // 10496 | Putrid Potpourri
         if (!Story.QuestProgression(10496))
         {
-            Core.HuntMonsterQuest(
-                10496,
-                ("moglinfeast", UseableMonsters[2], ClassType.Farm),
-                ("moglinfeast", UseableMonsters[3], ClassType.Farm)
-            );
+            Core.EnsureAccept(10496);
+            Core.EquipClass(ClassType.Farm);
+            Core.HuntMonster("moglinfeast", "Hay Fever Sylph", "Sylph Pollen", 8);
+            Core.HuntMonster("moglinfeast", "Redcap Mush", "Sauteed Mush", 8);
+            Core.EnsureComplete(10496);
         }
 
         // 10497 | Fairy Foray
@@ -1047,5 +1124,59 @@ public class CoreHarvestDay
         {
             Core.HuntMonsterQuest(10497, ("moglinfeast", UseableMonsters[4], ClassType.Solo));
         }
+    }
+	
+	public void CharityFeast()
+	{
+        if (Core.isCompletedBefore(10947) || !Core.isSeasonalMapActive("charityfeast"))
+            return;
+
+        Story.PreLoad(this);
+
+        string[] UseableMonsters =
+        [
+            "Fall Fae Queen", // UseableMonsters[0]
+            "Masked Skeleton", // UseableMonsters[1]
+            "Pumpkin Blossom Fae", // UseableMonsters[2]
+            "Sluagh King", // UseableMonsters[3]
+            "Sluagh Warrior", // UseableMonsters[4]
+            "Uninvited Guest", // UseableMonsters[5]
+        ];
+
+        // 10938 | Pumpkin Pop
+        Story.KillQuest(10938, "charityfeast", UseableMonsters[2]); // Magical Pumpkin Seeds x12
+
+        // 10939 | Black-Tie Pigs
+        Story.KillQuest(10939, "charityfeast", UseableMonsters[5]); // Confiscated Cravat x4
+
+        // 10940 | Unnecessary Patience
+        Story.MapItemQuest(10940, "charityfeast", 16408, 10);
+
+        // 10941 | Five-Star Service
+        Core.EnsureAccept(10941);
+        Core.HuntMonster("charityfeast", UseableMonsters[2], "Pumpkin Rind", 6);
+        Core.HuntMonster("charityfeast", UseableMonsters[5], "Embroidered Handkerchief", 6);
+        Core.EnsureComplete(10941);
+
+        // 10942 | Set Up to Fall
+        Story.MapItemQuest(10942, "charityfeast", [16409, 16410, 16411]);
+
+        // 10943 | Tricky Nixie
+        Story.KillQuest(10943, "charityfeast", UseableMonsters[0]); // Nixie's Amber x1
+
+        // 10944 | Undead Minyans
+        Story.KillQuest(10944, "charityfeast", UseableMonsters[1]); // Strange Mask x13
+
+        // 10945 | Crimson Corvus
+        Story.KillQuest(10945, "charityfeast", UseableMonsters[4]); // Sluagh Antler x24
+
+        // 10946 | Feast of Thrills
+        Core.EnsureAccept(10946);
+        Core.HuntMonster("charityfeast", UseableMonsters[1], "Chipped Mask", 6);
+        Core.HuntMonster("charityfeast", UseableMonsters[4], "Sluagh Feather", 6);
+        Core.EnsureComplete(10946);
+
+        // 10947 | King Mellori
+        Story.KillQuest(10947, "charityfeast", UseableMonsters[3]); // Sluagh King Defeated x1
     }
 }
