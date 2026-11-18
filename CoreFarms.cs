@@ -4410,10 +4410,10 @@ public class CoreFarms
         Bot.Wait.ForCellChange("Begin");
         Core.Sleep();
 
-        // Token D > Token C (purchase if needed)
-        if (dQuantity / 10 > 1 && cQuantity < 500 && dQuantity / 10 + cQuantity < 500)
+        // Token D > Token C (purchase up to the remaining capacity)
+        int buyC = Math.Min(dQuantity / 10, 500 - cQuantity);
+        if (buyC > 0)
         {
-            int buyC = dQuantity / 10;
             Core.BuyItem("collection", 325, "Super-Fan Swag Token C", buyC);
             Bot.Wait.ForActionCooldown(GameActions.BuyItem);
             Bot.Wait.ForItemBuy();
@@ -4421,10 +4421,10 @@ public class CoreFarms
 
         Core.Sleep();
 
-        // Token C > Token B (buy from shop if needed)
-        if (cQuantity / 10 > 1 && bQuantity < 200 && cQuantity / 10 + bQuantity < 200)
+        // Token C > Token B (purchase up to the remaining capacity)
+        int buyB = Math.Min(cQuantity / 10, 200 - bQuantity);
+        if (buyB > 0)
         {
-            int buyB = cQuantity / 10;
             Core.BuyItem("collection", 325, "Super-Fan Swag Token B", buyB);
             Bot.Wait.ForActionCooldown(GameActions.BuyItem);
             Bot.Wait.ForItemBuy();
@@ -4432,10 +4432,10 @@ public class CoreFarms
 
         Core.Sleep();
 
-        // Token B > Token A (buy from shop if needed)
-        if (bQuantity / 20 > 1 && aQuantity < 100 && bQuantity / 20 + aQuantity < 100)
+        // Token B > Token A (purchase up to the remaining capacity)
+        int buyA = Math.Min(bQuantity / 20, 100 - aQuantity);
+        if (buyA > 0)
         {
-            int buyA = bQuantity / 20;
             Core.BuyItem("collection", 325, "Super-Fan Swag Token A", buyA);
             Bot.Wait.ForActionCooldown(GameActions.BuyItem);
             Bot.Wait.ForItemBuy();
