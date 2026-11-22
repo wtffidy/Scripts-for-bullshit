@@ -233,7 +233,7 @@ public class CoreBots
             _scriptStopwatch = Stopwatch.StartNew();
 
             loadedBot = Bot.Manager.LoadedScript?
-                .Replace("\\", "/")
+                .Replace("\", "/")
                 .Split("/Scripts/")
                 .Last()
                 .Replace(".cs", "") ?? "Unknown";
@@ -615,7 +615,7 @@ public class CoreBots
                     );
 
                     // Prison Detector
-                    if (loadedBot.Replace("\\", "/") != "Tools/Butler")
+                    if (loadedBot.Replace("\", "/") != "Tools/Butler")
                     {
                         Bot.Events.MapChanged += PrisonDetector;
                         void PrisonDetector(string map)
@@ -7935,7 +7935,7 @@ public class CoreBots
         {
             foreach (string cs in currentScript.Where(x => x.StartsWith("//cs_include")).ToArray())
             {
-                List<string> pathParts = [ClientFileSources.SkuaDIR, .. cs.Replace("//cs_include ", "").Replace("\\", "/").Split('/')];
+                List<string> pathParts = [ClientFileSources.SkuaDIR, .. cs.Replace("//cs_include ", "").Replace("\", "/").Split('/')];
                 includedScript = File.ReadAllLines(Path.Combine([.. pathParts]));
 
                 if (includedScript.Any(line => line.Trim() == $"public class {_class}"))
@@ -9603,7 +9603,7 @@ public class CoreBots
     public async Task<string> FindBestServer()
     {
         List<Server> servers = await Bot.Servers.GetServers(true);
-        byte[] versionCheck = Encoding.UTF8.GetBytes("<msg t='sys'><body action='verChk' r='0'><ver v='165' /></body></msg>\\0");
+        byte[] versionCheck = Encoding.UTF8.GetBytes("<msg t='sys'><body action='verChk' r='0'><ver v='165' /></body></msg>\0");
         Dictionary<string, long> pingResults = new();
 
         foreach (Server server in servers.Where(s => s.Online && !string.IsNullOrWhiteSpace(s.IP) && s.Port > 0))
@@ -9642,7 +9642,7 @@ public class CoreBots
                         response.Clear();
 
                         if (message.Contains("action='apiOK'", StringComparison.OrdinalIgnoreCase) ||
-                            message.Contains("action=\\"apiOK\\"", StringComparison.OrdinalIgnoreCase))
+                            message.Contains("action=\"apiOK\"", StringComparison.OrdinalIgnoreCase))
                         {
                             stopwatch.Stop();
                             samples.Add(stopwatch.Elapsed.TotalMilliseconds);
@@ -9650,7 +9650,7 @@ public class CoreBots
                         }
 
                         if (message.Contains("action='apiKO'", StringComparison.OrdinalIgnoreCase) ||
-                            message.Contains("action=\\"apiKO\\"", StringComparison.OrdinalIgnoreCase))
+                            message.Contains("action=\"apiKO\"", StringComparison.OrdinalIgnoreCase))
                             break;
                     }
                 }
@@ -11976,8 +11976,8 @@ public class CoreBots
                     .Last()
                     .Replace('/', '\\')[1..];
 
-                if (botPath.StartsWith("Nulgath\\"))
-                    botPath = botPath.Replace("Nulgath\\", "Nation\\");
+                if (botPath.StartsWith("Nulgath\"))
+                    botPath = botPath.Replace("Nulgath\", "Nation\");
 
                 string[] allowedPathStarters =
                 {
@@ -12002,7 +12002,7 @@ public class CoreBots
                 };
 
                 if (!allowedPathStarters.Any(x => botPath.StartsWith(x)))
-                    botPath = "CustomPath\\" + botPath.Split("\\").Last();
+                    botPath = "CustomPath\" + botPath.Split("\").Last();
 
                 bodyValues.Add("entry.1597948191", botPath);
             }
