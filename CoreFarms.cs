@@ -1458,9 +1458,9 @@ public class CoreFarms
             if (!maxedQuests)
             {
                 int[] availableQuests =
-                    Bot.Quests.IsUnlocked(10812) ? new[] { 10810, 10811, 10812 } :
-                    Bot.Quests.IsUnlocked(10811) ? new[] { 10810, 10811 } :
-                    new[] { 10810 };
+                    Bot.Quests.IsUnlocked(10812) ? [10810, 10811, 10812] :
+                    Bot.Quests.IsUnlocked(10811) ? [10810, 10811] :
+                    [10810];
 
                 if (!availableQuests.SequenceEqual(currentQuests))
                 {
@@ -3216,11 +3216,11 @@ public class CoreFarms
     }
 
     public string[] AcceptablePvPAmulets =
-    {
+    [
         "Mithril PvP Amulet +15000",
         "Diamond PvP Amulet +5500",
         "Platinum PvP Amulet +5000",
-    };
+    ];
 
     public void DeathPitBrawlREP(int rank = 10)
     {
@@ -4275,7 +4275,7 @@ public class CoreFarms
         ToggleBoost(BoostType.Reputation);
         Core.Logger($"Farming rank {rank} for Yew Mountains");
 
-        Core.RegisterQuests(Core.IsMember ? new[] { 10345 } : new[] { 10341, 10346 });
+        Core.RegisterQuests(Core.IsMember ? new[] { 10345 } : [10341, 10346]);
         Core.AddDrop(
             Core.EnsureLoad(10342)
                 .Rewards.Select(r => r.Name)
@@ -4339,7 +4339,7 @@ public class CoreFarms
             Core.AddDrop("Super-Fan Swag Token D");
         Core.EquipClass(ClassType.Farm);
         Core.RegisterQuests(
-            !Core.IsMember ? new[] { 1304, 1307 } : new[] { 1310, 1312, 1313, 1314 }
+            !Core.IsMember ? new[] { 1304, 1307 } : [1310, 1312, 1313, 1314]
         );
 
         #region Token farm and check for Token A only
