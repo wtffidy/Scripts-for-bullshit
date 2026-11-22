@@ -16,7 +16,7 @@ public class FindBestPing
 {
     private const int TimeoutMs = 2500;
     private const int SampleCount = 3;
-    private static readonly byte[] VersionCheck = Encoding.UTF8.GetBytes("<msg t='sys'><body action='verChk' r='0'><ver v='165' /></body></msg>\\0");
+    private static readonly byte[] VersionCheck = Encoding.UTF8.GetBytes("<msg t='sys'><body action='verChk' r='0'><ver v='165' /></body></msg>\0");
 
     private IScriptInterface Bot => IScriptInterface.Instance;
     private CoreBots Core => CoreBots.Instance;
@@ -111,7 +111,7 @@ public class FindBestPing
                     response.Clear();
 
                     if (message.Contains("action='apiOK'", StringComparison.OrdinalIgnoreCase)
-                        || message.Contains("action=\\"apiOK\\"", StringComparison.OrdinalIgnoreCase))
+                        || message.Contains("action=\"apiOK\"", StringComparison.OrdinalIgnoreCase))
                     {
                         stopwatch.Stop();
                         samples.Add(stopwatch.Elapsed.TotalMilliseconds);
@@ -119,7 +119,7 @@ public class FindBestPing
                     }
 
                     if (message.Contains("action='apiKO'", StringComparison.OrdinalIgnoreCase)
-                        || message.Contains("action=\\"apiKO\\"", StringComparison.OrdinalIgnoreCase))
+                        || message.Contains("action=\"apiKO\"", StringComparison.OrdinalIgnoreCase))
                         break;
                 }
             }
