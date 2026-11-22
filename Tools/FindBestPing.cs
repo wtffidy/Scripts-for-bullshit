@@ -1,6 +1,6 @@
 /*
-name: Find Best Server Ping
-description: will spit out the  best server ( ping wise) into the logs ( diagnostics > logs )
+name: Find Top 3 Best Server Pings
+description: measures AQW handshake latency and logs the three fastest servers ( diagnostics > logs )
 tags: server, ping, ultra
 */
 
