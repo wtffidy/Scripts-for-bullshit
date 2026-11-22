@@ -233,7 +233,7 @@ public class CoreBots
             _scriptStopwatch = Stopwatch.StartNew();
 
             loadedBot = Bot.Manager.LoadedScript?
-                .Replace("\", "/")
+                .Replace("\\", "/")
                 .Split("/Scripts/")
                 .Last()
                 .Replace(".cs", "") ?? "Unknown";
@@ -615,7 +615,7 @@ public class CoreBots
                     );
 
                     // Prison Detector
-                    if (loadedBot.Replace("\", "/") != "Tools/Butler")
+                    if (loadedBot.Replace("\\", "/") != "Tools/Butler")
                     {
                         Bot.Events.MapChanged += PrisonDetector;
                         void PrisonDetector(string map)
@@ -7935,7 +7935,7 @@ public class CoreBots
         {
             foreach (string cs in currentScript.Where(x => x.StartsWith("//cs_include")).ToArray())
             {
-                List<string> pathParts = [ClientFileSources.SkuaDIR, .. cs.Replace("//cs_include ", "").Replace("\", "/").Split('/')];
+                List<string> pathParts = [ClientFileSources.SkuaDIR, .. cs.Replace("//cs_include ", "").Replace("\\", "/").Split('/')];
                 includedScript = File.ReadAllLines(Path.Combine([.. pathParts]));
 
                 if (includedScript.Any(line => line.Trim() == $"public class {_class}"))
@@ -9597,8 +9597,8 @@ public class CoreBots
     }
 
     /// <summary>
-    /// Finds the three fastest game servers by measuring actual AQW handshake latency.
-    /// Uses three samples per server and ranks servers by their median successful latency.
+    /// Finds the optimal game server by measuring actual AQW handshake latency.
+    /// Uses three samples per server and selects the server with the lowest median latency.
     /// </summary>
     public async Task<string> FindBestServer()
     {
@@ -9668,19 +9668,14 @@ public class CoreBots
             pingResults[server.IP] = (long)Math.Round(samples[samples.Count / 2], MidpointRounding.AwayFromZero);
         }
 
-        List<Server> bestServers = servers
-            .Where(server => pingResults.TryGetValue(server.IP, out long ping) && ping != long.MaxValue)
-            .OrderBy(server => pingResults[server.IP])
-            .ThenBy(server => server.Name, StringComparer.OrdinalIgnoreCase)
-            .Take(3)
-            .ToList();
+        Server? best = servers
+            .Where(s => pingResults.TryGetValue(s.IP, out long ping) && ping != long.MaxValue)
+            .OrderBy(s => pingResults[s.IP])
+            .FirstOrDefault();
+        if (best is not null)
+            return $"Most optimal server: {best.Name} ({best.IP}) - {pingResults[best.IP]}ms";
 
-        if (bestServers.Count == 0)
-            return "Could not determine an optimal server, all hosts failed their AQW handshake.";
-
-        return $"Top {bestServers.Count} servers by AQW handshake latency:{Environment.NewLine}" +
-            string.Join(Environment.NewLine, bestServers.Select((server, index) =>
-                $"{index + 1}. {server.Name} ({server.IP}) - {pingResults[server.IP]}ms"));
+        return "Could not determine an optimal server, all hosts failed their AQW handshake.";
     }
 
 
@@ -11976,8 +11971,8 @@ public class CoreBots
                     .Last()
                     .Replace('/', '\\')[1..];
 
-                if (botPath.StartsWith("Nulgath\"))
-                    botPath = botPath.Replace("Nulgath\", "Nation\");
+                if (botPath.StartsWith("Nulgath\\"))
+                    botPath = botPath.Replace("Nulgath\\", "Nation\\");
 
                 string[] allowedPathStarters =
                 {
@@ -12002,7 +11997,7 @@ public class CoreBots
                 };
 
                 if (!allowedPathStarters.Any(x => botPath.StartsWith(x)))
-                    botPath = "CustomPath\" + botPath.Split("\").Last();
+                    botPath = "CustomPath\\" + botPath.Split("\\").Last();
 
                 bodyValues.Add("entry.1597948191", botPath);
             }
