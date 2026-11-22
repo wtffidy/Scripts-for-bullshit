@@ -39,7 +39,7 @@ public class FindBestPing
     private async Task<string> FindTopThreeServers()
     {
         List<Server> servers = await Bot.Servers.GetServers(true);
-        byte[] versionCheck = Encoding.UTF8.GetBytes("<msg t='sys'><body action='verChk' r='0'><ver v='165' /></body></msg>\\0");
+        byte[] versionCheck = Encoding.UTF8.GetBytes("<msg t='sys'><body action='verChk' r='0'><ver v='165' /></body></msg>\0");
         List<(Server Server, long Ping)> pingResults = new();
 
         foreach (Server server in servers.Where(server =>
@@ -79,7 +79,7 @@ public class FindBestPing
                         response.Clear();
 
                         if (message.Contains("action='apiOK'", StringComparison.OrdinalIgnoreCase) ||
-                            message.Contains("action=\\"apiOK\\"", StringComparison.OrdinalIgnoreCase))
+                            message.Contains("action=\"apiOK\"", StringComparison.OrdinalIgnoreCase))
                         {
                             stopwatch.Stop();
                             samples.Add(stopwatch.Elapsed.TotalMilliseconds);
@@ -87,7 +87,7 @@ public class FindBestPing
                         }
 
                         if (message.Contains("action='apiKO'", StringComparison.OrdinalIgnoreCase) ||
-                            message.Contains("action=\\"apiKO\\"", StringComparison.OrdinalIgnoreCase))
+                            message.Contains("action=\"apiKO\"", StringComparison.OrdinalIgnoreCase))
                             break;
                     }
                 }
