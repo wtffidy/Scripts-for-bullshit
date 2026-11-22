@@ -9597,13 +9597,13 @@ public class CoreBots
     }
 
     /// <summary>
-    /// Finds the optimal game server by measuring actual AQW handshake latency.
-    /// Uses three samples per server and selects the server with the lowest median latency.
+    /// Finds the three fastest game servers by measuring actual AQW handshake latency.
+    /// Uses three samples per server and ranks servers by their median successful latency.
     /// </summary>
     public async Task<string> FindBestServer()
     {
         List<Server> servers = await Bot.Servers.GetServers(true);
-        byte[] versionCheck = Encoding.UTF8.GetBytes("<msg t='sys'><body action='verChk' r='0'><ver v='165' /></body></msg>\0");
+        byte[] versionCheck = Encoding.UTF8.GetBytes("<msg t='sys'><body action='verChk' r='0'><ver v='165' /></body></msg>\\0");
         Dictionary<string, long> pingResults = new();
 
         foreach (Server server in servers.Where(s => s.Online && !string.IsNullOrWhiteSpace(s.IP) && s.Port > 0))
@@ -9642,7 +9642,7 @@ public class CoreBots
                         response.Clear();
 
                         if (message.Contains("action='apiOK'", StringComparison.OrdinalIgnoreCase) ||
-                            message.Contains("action=\"apiOK\"", StringComparison.OrdinalIgnoreCase))
+                            message.Contains("action=\\"apiOK\\"", StringComparison.OrdinalIgnoreCase))
                         {
                             stopwatch.Stop();
                             samples.Add(stopwatch.Elapsed.TotalMilliseconds);
@@ -9650,7 +9650,7 @@ public class CoreBots
                         }
 
                         if (message.Contains("action='apiKO'", StringComparison.OrdinalIgnoreCase) ||
-                            message.Contains("action=\"apiKO\"", StringComparison.OrdinalIgnoreCase))
+                            message.Contains("action=\\"apiKO\\"", StringComparison.OrdinalIgnoreCase))
                             break;
                     }
                 }
@@ -9668,14 +9668,19 @@ public class CoreBots
             pingResults[server.IP] = (long)Math.Round(samples[samples.Count / 2], MidpointRounding.AwayFromZero);
         }
 
-        Server? best = servers
-            .Where(s => pingResults.TryGetValue(s.IP, out long ping) && ping != long.MaxValue)
-            .OrderBy(s => pingResults[s.IP])
-            .FirstOrDefault();
-        if (best is not null)
-            return $"Most optimal server: {best.Name} ({best.IP}) - {pingResults[best.IP]}ms";
+        List<Server> bestServers = servers
+            .Where(server => pingResults.TryGetValue(server.IP, out long ping) && ping != long.MaxValue)
+            .OrderBy(server => pingResults[server.IP])
+            .ThenBy(server => server.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(3)
+            .ToList();
 
-        return "Could not determine an optimal server, all hosts failed their AQW handshake.";
+        if (bestServers.Count == 0)
+            return "Could not determine an optimal server, all hosts failed their AQW handshake.";
+
+        return $"Top {bestServers.Count} servers by AQW handshake latency:{Environment.NewLine}" +
+            string.Join(Environment.NewLine, bestServers.Select((server, index) =>
+                $"{index + 1}. {server.Name} ({server.IP}) - {pingResults[server.IP]}ms"));
     }
 
 
