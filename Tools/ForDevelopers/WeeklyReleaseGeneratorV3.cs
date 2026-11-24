@@ -347,7 +347,7 @@ public class WeeklyReleaseGeneratorV3
 
         List<DropPacketCollector.MonsterDrops> usedMonsters = quests
             .SelectMany(quest => (quest.Requirements ?? new List<ItemBase>())
-                .Select(requirement => FindDropMonster(requirement, quest.Name, monsters)))
+                .Select(requirement => FindDropMonster(requirement, quest.ID, quest.Name, monsters)))
             .Where(monster => monster != null)
             .Select(monster => monster!)
             .DistinctBy(monster => monster.MonsterID)
@@ -485,7 +485,7 @@ public class WeeklyReleaseGeneratorV3
         List<ItemBase> requirements = quest.Requirements ?? new();
         List<ItemBase> acceptRequirements = quest.AcceptRequirements ?? new();
         DropPacketCollector.MonsterDrops?[] localDrops = requirements
-            .Select(requirement => FindDropMonster(requirement, quest.Name, monsters))
+            .Select(requirement => FindDropMonster(requirement, quest.ID, quest.Name, monsters))
             .ToArray();
         IReadOnlyList<int> mapObjects = mapObjectsByQuest.TryGetValue(quest.ID, out IReadOnlyList<int>? objects)
             ? objects
@@ -789,24 +789,66 @@ public class WeeklyReleaseGeneratorV3
 
     private static DropPacketCollector.MonsterDrops? FindDropMonster(
         ItemBase requirement,
+        int questID,
         string questName,
         IReadOnlyList<DropPacketCollector.MonsterDrops> monsters
-    ) => monsters
-        .Where(monster => monster.Items.Any(item => item.ID == requirement.ID))
-        .OrderByDescending(monster => monster.Items
-            .Where(item => item.ID == requirement.ID)
-            .Max(item => QuestAssociation(item, questName)))
-        .ThenByDescending(monster => monster.MonMapIDs.Count)
-        .ThenBy(monster => monster.MaxHP)
-        .ThenBy(monster => monster.MonsterID)
-        .FirstOrDefault();
-
-    private static int QuestAssociation(DropPacketCollector.DropItem item, string questName)
+    )
     {
-        if (item.QuestObjectives.Contains(questName, StringComparer.OrdinalIgnoreCase))
+        // monsterDrops quest associations identify quests by ID. Keep the name
+        // check as a compatibility fallback for packet variants that send names.
+        List<(DropPacketCollector.MonsterDrops Monster, int Association)> exactMatches = monsters
+            .Select(monster => (
+                Monster: monster,
+                Association: monster.Items
+                    .Where(item => item.ID == requirement.ID)
+                    .Select(item => QuestAssociation(item, questID, questName))
+                    .DefaultIfEmpty(0)
+                    .Max()
+            ))
+            .Where(candidate => candidate.Monster.Items.Any(item => item.ID == requirement.ID))
+            .ToList();
+
+        if (exactMatches.Count > 0)
+        {
+            List<(DropPacketCollector.MonsterDrops Monster, int Association)> associatedMatches = exactMatches
+                .Where(candidate => candidate.Association > 0)
+                .ToList();
+
+            return (associatedMatches.Count > 0 ? associatedMatches : exactMatches)
+                .OrderByDescending(candidate => candidate.Association)
+                .ThenByDescending(candidate => candidate.Monster.MonMapIDs.Count)
+                .ThenBy(candidate => candidate.Monster.MaxHP)
+                .ThenBy(candidate => candidate.Monster.MonsterID)
+                .Select(candidate => candidate.Monster)
+                .FirstOrDefault();
+        }
+
+        // A quest-associated drop is still a valid source when the item ID in
+        // the quest packet differs from the ID reported by the drop packet.
+        // Only use this fallback when it identifies one monster unambiguously.
+        List<DropPacketCollector.MonsterDrops> questMatches = monsters
+            .Where(monster => monster.Items.Any(item =>
+                QuestAssociation(item, questID, questName) > 0))
+            .DistinctBy(monster => monster.MonsterID)
+            .ToList();
+
+        return questMatches.Count == 1 ? questMatches[0] : null;
+    }
+
+    private static int QuestAssociation(DropPacketCollector.DropItem item, int questID, string questName)
+    {
+        string questIDText = questID.ToString(CultureInfo.InvariantCulture);
+
+        if (item.QuestObjectives.Any(value =>
+                value.Equals(questIDText, StringComparison.OrdinalIgnoreCase)
+                || value.Equals(questName, StringComparison.OrdinalIgnoreCase)))
             return 2;
-        if (item.QuestGated.Contains(questName, StringComparer.OrdinalIgnoreCase))
+
+        if (item.QuestGated.Any(value =>
+                value.Equals(questIDText, StringComparison.OrdinalIgnoreCase)
+                || value.Equals(questName, StringComparison.OrdinalIgnoreCase)))
             return 1;
+
         return 0;
     }
 
