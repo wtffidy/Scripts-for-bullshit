@@ -508,6 +508,7 @@ public class WeeklyReleaseGeneratorV3
 
         lines.Add("");
         lines.Add($"        // {quest.ID} | {EscapeComment(quest.Name)}");
+        int questBodyStart = lines.Count;
         if (requirements.Count > 0 && acceptRequirements.Count > 0)
         {
             lines.Add("        if (");
@@ -602,7 +603,7 @@ public class WeeklyReleaseGeneratorV3
             {
                 if (!currentMapHelperCompletesQuest)
                     lines.Add($"        Core.EnsureComplete({quest.ID});");
-                return;
+                goto FinishQuest;
             }
 
             bool hasAmbiguousTarget = huntIndexes.Any(index => localDrops[index] != null
@@ -618,7 +619,7 @@ public class WeeklyReleaseGeneratorV3
                 }
                 EmitExplicitHunts(lines, quest, requirements, localDrops, huntIndexes, map, usedMonsters);
                 lines.Add($"        Core.EnsureComplete({quest.ID});");
-                return;
+                goto FinishQuest;
             }
 
             List<int> orderedIndexes = [.. huntIndexes.OrderBy(index => index)];
@@ -660,6 +661,12 @@ public class WeeklyReleaseGeneratorV3
                 lines.Add($"        Core.EnsureComplete({quest.ID});");
             }
         }
+    FinishQuest:
+        lines.Insert(questBodyStart, $"        if (!Story.QuestProgression({quest.ID}))");
+        lines.Insert(questBodyStart + 1, "        {");
+        for (int index = questBodyStart + 2; index < lines.Count; index++)
+            lines[index] = "    " + lines[index];
+        lines.Add("        }");
     }
 
     private static List<int> MatchMapItemIndexes(
