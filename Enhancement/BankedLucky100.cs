@@ -1,6 +1,6 @@
 /*
 name: Banked Lucky 100 Manager
-description: Unbanks items already enhanced with level 100 Lucky, runs SmartEnhance for the current class, then rebanks the selected items.
+description: Processes banked level 100 Lucky-enhanced class items one at a time.
 tags: bank, lucky, enhancement, smart, enhance
 */
 //cs_include Scripts/CoreBots.cs
@@ -33,52 +33,69 @@ public class BankedLucky100
     }
 
     /// <summary>
-    /// Unbanks every bank item that already has a level 100 Lucky enhancement,
-    /// runs SmartEnhance for the currently equipped class, and returns those
-    /// items to the bank.
+    /// Finds banked level 100 Lucky-enhanced class items, then processes each
+    /// item individually so only one class is unbanked at a time.
     /// </summary>
     private void Run()
     {
-        List<int> lucky100ItemIDs = Bot.Bank.Items
+        List<(int ID, string Name)> lucky100Classes = Bot.Bank.Items
             .Where(item => item != null
+                && item.Category == ItemCategory.Class
                 && item.EnhancementLevel == 100
                 && item.EnhancementPatternID == (int)EnhancementType.Lucky)
-            .Select(item => item.ID)
+            .Select(item => (item.ID, item.Name ?? $"Item {item.ID}"))
             .ToList();
 
-        if (lucky100ItemIDs.Count == 0)
+        if (lucky100Classes.Count == 0)
         {
-            Core.Logger("No level 100 Lucky-enhanced items were found in the bank.");
+            Core.Logger("No level 100 Lucky-enhanced class items were found in the bank.");
             return;
         }
 
-        Core.Logger($"Found {lucky100ItemIDs.Count} level 100 Lucky-enhanced bank item(s).");
+        Core.Logger($"Found {lucky100Classes.Count} level 100 Lucky-enhanced class item(s):");
+        for (int i = 0; i < lucky100Classes.Count; i++)
+            Core.Logger($"  {i + 1}/{lucky100Classes.Count}: {lucky100Classes[i].Name} (ID: {lucky100Classes[i].ID})");
 
-        Core.Unbank(lucky100ItemIDs.ToArray());
+        int processed = 0;
 
-        List<int> unbankedItemIDs = lucky100ItemIDs
-            .Where(itemID => Bot.Inventory.Contains(itemID))
-            .ToList();
-
-        if (unbankedItemIDs.Count == 0)
+        foreach ((int itemID, string itemName) in lucky100Classes)
         {
-            Core.Logger("None of the matching items could be moved into inventory.");
-            return;
+            if (Bot.Bank?.Contains(itemID) != true)
+            {
+                Core.Logger($"Skipping {itemName}: no longer in the bank.");
+                continue;
+            }
+
+            Core.Logger($"Processing {itemName} ({processed + 1}/{lucky100Classes.Count}).");
+
+            Core.Unbank(itemID);
+            Core.Sleep();
+
+            if (!Bot.Inventory.Contains(itemID))
+            {
+                Core.Logger($"Failed to unbank {itemName}. Skipping it.");
+                continue;
+            }
+
+            // SmartEnhance targets the class item by name and also enhances equipped gear.
+            Adv.SmartEnhance(itemName, true);
+
+            // Your custom processing can go here while this class is in inventory.
+
+            // Core.ToBank intentionally rejects class items in the current Game4000 client.
+            // Try the inventory's direct bank transfer and verify the result.
+            bool banked = Bot.Inventory.EnsureToBank(itemID);
+            Core.Sleep();
+
+            if (banked || Bot.Bank?.Contains(itemID) == true)
+            {
+                processed++;
+                Core.Logger($"Returned {itemName} to the bank.");
+            }
+            else
+                Core.Logger($"Could not return {itemName} to the bank. It remains in inventory.");
         }
 
-        string? className = Bot.Player.CurrentClass?.Name;
-        if (!string.IsNullOrWhiteSpace(className))
-        {
-            // SmartEnhance selects the optimal enhancement setup for this class
-            // and applies it to the currently equipped gear.
-            Adv.SmartEnhance(className, true);
-        }
-        else
-            Core.Logger("Could not determine the currently equipped class. Skipping SmartEnhance.");
-
-        // Your custom processing can go here before the selected items are banked again.
-
-        Core.ToBank(unbankedItemIDs.ToArray());
-        Core.Logger($"Finished. Returned {unbankedItemIDs.Count} selected item(s) to the bank.");
+        Core.Logger($"Finished. Successfully processed and returned {processed}/{lucky100Classes.Count} class item(s).");
     }
 }
