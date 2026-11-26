@@ -1,6 +1,6 @@
 /*
 name: Banked Lucky 100 Manager
-description: Processes banked level 100 Lucky-enhanced class items one at a time.
+description: Scans banked gear and upgrades eligible items to level 100 Lucky enhancement one at a time.
 tags: bank, lucky, enhancement, smart, enhance
 */
 //cs_include Scripts/CoreBots.cs
@@ -33,69 +33,102 @@ public class BankedLucky100
     }
 
     /// <summary>
-    /// Finds banked level 100 Lucky-enhanced class items, then processes each
-    /// item individually so only one class is unbanked at a time.
+    /// Scans every bank item, skips items already at level 100 Lucky, and
+    /// enhances each eligible remaining item individually before rebanking it.
     /// </summary>
     private void Run()
     {
-        List<(int ID, string Name)> lucky100Classes = Bot.Bank.Items
-            .Where(item => item != null
-                && item.Category == ItemCategory.Class
-                && item.EnhancementLevel == 100
-                && item.EnhancementPatternID == (int)EnhancementType.Lucky)
-            .Select(item => (item.ID, item.Name ?? $"Item {item.ID}"))
-            .ToList();
-
-        if (lucky100Classes.Count == 0)
+        if (Bot.Player.Level < 100)
         {
-            Core.Logger("No level 100 Lucky-enhanced class items were found in the bank.");
+            Core.Logger($"Level 100 Lucky enhancements require level 100. Current level: {Bot.Player.Level}. Stopping.");
             return;
         }
 
-        Core.Logger($"Found {lucky100Classes.Count} level 100 Lucky-enhanced class item(s):");
-        for (int i = 0; i < lucky100Classes.Count; i++)
-            Core.Logger($"  {i + 1}/{lucky100Classes.Count}: {lucky100Classes[i].Name} (ID: {lucky100Classes[i].ID})");
+        List<(int ID, string Name, ItemCategory Category, bool AlreadyLucky100)> bankItems = Bot.Bank.Items
+            .Where(item => item != null)
+            .Select(item => (
+                item.ID,
+                item.Name ?? $"Item {item.ID}",
+                item.Category,
+                item.EnhancementLevel == 100
+                    && item.EnhancementPatternID == (int)EnhancementType.Lucky
+            ))
+            .ToList();
 
-        int processed = 0;
-
-        foreach ((int itemID, string itemName) in lucky100Classes)
+        if (bankItems.Count == 0)
         {
+            Core.Logger("Your bank is empty. Nothing to process.");
+            return;
+        }
+
+        Core.Logger($"Found {bankItems.Count} item(s) in the bank:");
+        foreach ((int itemID, string itemName, ItemCategory category, bool alreadyLucky100) in bankItems)
+            Core.Logger($"  {itemName} (ID: {itemID}, Category: {category}){(alreadyLucky100 ? " [Already Lucky 100]" : string.Empty)}");
+
+        List<(int ID, string Name, ItemCategory Category)> itemsToEnhance = bankItems
+            .Where(item => !item.AlreadyLucky100 && Adv.EnhanceableCatagories.Contains(item.Category))
+            .Select(item => (item.ID, item.Name, item.Category))
+            .ToList();
+
+        int skipped = bankItems.Count - itemsToEnhance.Count;
+        Core.Logger($"Queued {itemsToEnhance.Count} item(s) for Lucky 100. Skipping {skipped} already-correct or unenhanceable item(s).");
+
+        int enhanced = 0;
+        int failed = 0;
+
+        foreach ((int itemID, string itemName, ItemCategory category) in itemsToEnhance)
+        {
+            if (Bot.ShouldExit)
+                break;
+
             if (Bot.Bank?.Contains(itemID) != true)
             {
-                Core.Logger($"Skipping {itemName}: no longer in the bank.");
+                Core.Logger($"Skipping {itemName}: it is no longer in the bank.");
+                failed++;
                 continue;
             }
 
-            Core.Logger($"Processing {itemName} ({processed + 1}/{lucky100Classes.Count}).");
-
+            Core.Logger($"[{enhanced + failed + 1}/{itemsToEnhance.Count}] Unbanking {itemName} ({category}).");
             Core.Unbank(itemID);
             Core.Sleep();
 
             if (!Bot.Inventory.Contains(itemID))
             {
-                Core.Logger($"Failed to unbank {itemName}. Skipping it.");
+                Core.Logger($"Failed to unbank {itemName}. Moving to the next item.");
+                failed++;
                 continue;
             }
 
-            // SmartEnhance targets the class item by name and also enhances equipped gear.
-            Adv.SmartEnhance(itemName, true);
+            // Apply standard Lucky enhancement to this item only.
+            Adv.EnhanceItem(itemName, EnhancementType.Lucky, logging: true, bypassDisableAutoEnhance: true);
+            Core.Sleep();
 
-            // Your custom processing can go here while this class is in inventory.
+            InventoryItem? updatedItem = Bot.Inventory.Items.FirstOrDefault(item => item.ID == itemID);
+            if (updatedItem == null
+                || updatedItem.EnhancementLevel != 100
+                || updatedItem.EnhancementPatternID != (int)EnhancementType.Lucky)
+            {
+                Core.Logger($"Enhancement was not verified for {itemName}. Leaving it in inventory for review.");
+                failed++;
+                continue;
+            }
 
-            // Core.ToBank intentionally rejects class items in the current Game4000 client.
-            // Try the inventory's direct bank transfer and verify the result.
+            // Use the direct inventory transfer because Core.ToBank currently blocks class items.
             bool banked = Bot.Inventory.EnsureToBank(itemID);
             Core.Sleep();
 
             if (banked || Bot.Bank?.Contains(itemID) == true)
             {
-                processed++;
-                Core.Logger($"Returned {itemName} to the bank.");
+                enhanced++;
+                Core.Logger($"Successfully enhanced and banked {itemName}.");
             }
             else
+            {
                 Core.Logger($"Could not return {itemName} to the bank. It remains in inventory.");
+                failed++;
+            }
         }
 
-        Core.Logger($"Finished. Successfully processed and returned {processed}/{lucky100Classes.Count} class item(s).");
+        Core.Logger($"Finished. Enhanced and banked: {enhanced}. Failed or left for review: {failed}.");
     }
 }
